@@ -144,9 +144,161 @@ pub enum Register {
     Gcc0 = 0x44,
     /// Graphic Cursor Color 1.
     Gcc1 = 0x45,
+    /// Canvas Start Address 1.
+    Cvssa1 = 0x50,
+    /// Canvas Start Address 2.
+    Cvssa2 = 0x51,
+    /// Canvas Start Address 3.
+    Cvssa3 = 0x52,
+    /// Canvas Start Address 4.
+    Cvssa4 = 0x53,
+    /// Canvas Image Width 1.
+    CvsImwth1 = 0x54,
+    /// Canvas Image Width 2.
+    CvsImwth2 = 0x55,
+    /// Active Window Upper-Left Corner X-Coordinates 1.
+    AwulX1 = 0x56,
+    /// Active Window Upper-Left Corner X-Coordinates 2.
+    AwulX2 = 0x57,
+    /// Active Window Upper-Left Corner Y-Coordinates 1.
+    AwulY1 = 0x58,
+    /// Active Window Upper-Left Corner Y-Coordinates 2.
+    AwulY2 = 0x59,
+    /// Active Window Width 1.
+    AwWth1 = 0x5A,
+    /// Active Window Width 2.
+    AwWth2 = 0x5B,
+    /// Active Window Height 1.
+    AwHt1 = 0x5C,
+    /// Active Window Height 2.
+    AwHt2 = 0x5D,
+    /// Color Depth of Canvas & Active Window.
+    AwColor = 0x5E,
+    /// Graphic Read/Write X-Coordinate Register 1.
+    Curh1 = 0x5F,
+    /// Graphic Read/Write X-Coordinate Register 2.
+    Curh2 = 0x60,
+    /// Graphic Read/Write Y-Coordinate Register 1.
+    Curv1 = 0x61,
+    /// Graphic Read/Write Y-Coordinate Register 2.
+    Curv2 = 0x62,
+    /// Text Write X-Coordinates Register 1.
+    FCurx1 = 0x63,
+    /// Text Write X-Coordinates Register 2.
+    FCurx2 = 0x64,
+    /// Text Write Y-Coordinates Register 1.
+    FCury1 = 0x65,
+    /// Text Write Y-Coordinates Register 2.
+    FCury2 = 0x66,
+    /// Draw Line/Triangle Control Register 0
+    Dcr0 = 0x67,
+    /// Draw Line/Rectangle/Triangle Point 1 X-Coordinates Register 1.
+    Dlhsr1 = 0x68,
+    /// Draw Line/Rectangle/Triangle Point 1 X-Coordinates Register 2.
+    Dlhsr2 = 0x69,
+    /// Draw Line/Rectangle/Triangle Point 1 Y-Coordinates Register 1.
+    Dlvsr1 = 0x6A,
+    /// Draw Line/Rectangle/Triangle Point 1 Y-Coordinates Register 2.
+    Dlvsr2 = 0x6B,
+    /// Draw Line/Rectangle/Triangle Point 2 X-Coordinates Register 1.
+    Dlher1 = 0x6C,
+    /// Draw Line/Rectangle/Triangle Point 2 X-Coordinates Register 2.
+    Dlher2 = 0x6D,
+    /// Draw Line/Rectangle/Triangle Point 2 Y-Coordinates Register 1.
+    Dlver1 = 0x6E,
+    /// Draw Line/Rectangle/Triangle Point 2 Y-Coordinates Register 2.
+    Dlver2 = 0x6F,
+    /// Draw Triangle Point 3 X-Coordinates Register 1.
+    Dtph1 = 0x70,
+    /// Draw Triangle Point 3 X-Coordinates Register 2.
+    Dtph2 = 0x71,
+    /// Draw Triangle Point 3 Y-Coordinates Register 1.
+    Dtpv1 = 0x72,
+    /// Draw Triangle Point 3 Y-Coordinates Register 2.
+    Dtpv2 = 0x73,
+    /// Draw Circle/Ellipse/Ellipse Curve/Circle Square Control Register 1.
+    Dcr1 = 0x76,
+    ///  Draw Circle/Ellipse/Rounded-Rectangle Major-Radius Register 1.
+    EllA1 = 0x77,
+    ///  Draw Circle/Ellipse/Rounded-Rectangle Major-Radius Register 2.
+    EllA2 = 0x78,
+    /// Draw Circle/Ellipse/Rounded-rectangle Minor-Radius Register 1.
+    EllB1 = 0x79,
+    /// Draw Circle/Ellipse/Rounded-rectangle Minor-Radius Register 2.
+    EllB2 = 0x7A,
+    /// Draw Circle/Ellipse/Rounded-Rectangle Center X-Coordinates Register 1.
+    Dehr1 = 0x7B,
+    /// Draw Circle/Ellipse/Rounded-Rectangle Center X-Coordinates Register 2.
+    Dehr2 = 0x7C,
+    /// Draw Circle/Ellipse/Rounded-Rectangle Center Y-Coordinates Register 1.
+    Devr1 = 0x7D,
+    /// Draw Circle/Ellipse/Rounded-Rectangle Center Y-Coordinates Register 2.
+    Devr2 = 0x7E,
+    /// Foreground Color Register - Red.
+    Fgcr = 0xD2,
+    /// Foreground Color Register - Green.
+    Fgcg = 0xD3,
+    /// Foreground Color Register - Blue.
+    Fgcb = 0xD4,
 
-    // Geometric engine control registers:
-    // TODO: page 156  https://www.buydisplay.com/download/ic/LT7683.pdf
+    // PWM control registers:
+    // TODO: page 165 https://www.buydisplay.com/download/ic/LT7683.pdf
+
+    // Bit block transfer engine (BTE) control registers:
+    // TODO: page 168 https://www.buydisplay.com/download/ic/LT7683.pdf
+
+    // Serial Flash & SPI Master Control Registers:
+    // TODO: page 176 https://www.buydisplay.com/download/ic/LT7683.pdf
+
+    // Text engine registers:
+    /// Character Control Register 0.
+    Ccr0 = 0xCC,
+    /// Character Control Register 1.
+    Ccr1 = 0xCD,
+    /// Character Line gap Setting Register.
+    Fldr = 0xD0,
+    /// Character to Character Space Setting Register.
+    F2fssr = 0xD1,
+    /// Background Color Register - Red.
+    Bgcr = 0xD5,
+    /// Background Color Register - Green.
+    Bgcg = 0xD6,
+    /// Background Color Register - Blue.
+    Bgcb = 0xD7,
+    /// CGRAM Start Address 0.
+    CgramStr0 = 0xDB,
+
+    // Power Management Control Register:
+    /// Power Management Register
+    Pmu = 0xDF,
+
+    // Display RAM Control Register:
+    /// SDRAM Attribute Register.
+    Sdrar = 0xE0,
+    /// SDRAM Mode Register & Extended Mode Register.
+    Sdrmd = 0xE1,
+    /// SDRAM Auto Refresh Interval 1.
+    SdrRef1 = 0xE2,
+    /// SDRAM Auto Refresh Interval 2.
+    SdrRef2 = 0xE3,
+    /// SDRAM Control Register.
+    Sdrcr = 0xE4,
+
+    // GPIO Register:
+    /// GPIO-A Direction.
+    Gpioad = 0xF0,
+    /// GPIO-A.
+    Gpioa = 0xF1,
+    /// GPIO-B.
+    Gpiob = 0xF2,
+    /// GPIO-C Direction.
+    Gpiocd = 0xF3,
+    /// GPIO-C.
+    Gpioc = 0xF4,
+    /// GPIO-D Direction.
+    Gpiodd = 0xF5,
+    /// GPIO-D.
+    Gpiod = 0xF6,
 }
 
 pub struct LT7683<DATA, RS, WR, RD, CS, RES, DELAY> {
