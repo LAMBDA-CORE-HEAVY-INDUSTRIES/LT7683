@@ -25,22 +25,15 @@ fn main() -> ! {
         let mosi = gpioa.pa7.into_alternate::<5>(); // SPI1_MOSI / sdo
         let miso = gpioa.pa6.into_alternate::<5>();  // sdi
         let cs = gpioa.pa4.into_push_pull_output();  // scs
-        
         let res = gpiob.pb0.into_push_pull_output_in_state(hal::gpio::PinState::High);
-
-        let spi_mode = Mode {
-            polarity: Polarity::IdleLow,
-            phase: Phase::CaptureOnFirstTransition,
-        };
-
+        
         let spi_bus = Spi::new(
             dp.SPI1,
             (sck, miso, mosi),
-            spi_mode,
+            embedded_hal::spi::MODE_0,
             1.MHz(),
             &clocks,
         );
-
         let delay = cp.SYST.delay(&clocks);
         let spi_device = ExclusiveDevice::new(spi_bus, cs, delay).unwrap();
 
