@@ -13,7 +13,7 @@ pub trait LT7683Interface {
     fn read_status(&mut self) -> Result<u8, Self::Error>;
 }
 
-pub struct DisplayTiming {
+pub struct DisplayConfig {
     pub width: u16,
     pub height: u16,
     pub h_back_porch: u16,
@@ -22,11 +22,12 @@ pub struct DisplayTiming {
     pub v_back_porch: u16,
     pub v_front_porch: u16,
     pub v_sync_width: u16,
+    pub color_depth: ColorDepth,
 }
 
-impl DisplayTiming {
+impl Default for DisplayConfig {
     /// Default timing for 7" 1024x600 display (ER-TFT070A2-6-5633).
-    pub const fn default_1024x600() -> Self {
+    fn default() -> Self {
         Self {
             width: 1024,
             height: 600,
@@ -36,29 +37,37 @@ impl DisplayTiming {
             v_back_porch: 23,
             v_front_porch: 12,
             v_sync_width: 10,
+            color_depth: ColorDepth::Bpp24,
         }
     }
 }
 
+impl DisplayConfig {
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
 pub struct LT7683<I: LT7683Interface, RESET> {
-    pub interface: I,
+    pub spi_interface: I,
     pub res: RESET,
+    pub config: DisplayConfig,
 }
 
 impl<I: LT7683Interface, RESET: OutputPin> LT7683<I, RESET> {
-    pub fn new(interface: I, res: RESET) -> Self {
-        Self { interface, res }
+    pub fn new(spi_interface: I, res: RESET, display_config: DisplayConfig) -> Self {
+        Self { spi_interface, res, config: display_config}
     }
 
     pub fn write_register(&mut self, register: Register, data: u8) -> Result<(), I::Error> {
-        self.interface.write_command(register)?;
-        self.interface.write_data(data)?;
+        self.spi_interface.write_command(register)?;
+        self.spi_interface.write_data(data)?;
         Ok(())
     }
 
     pub fn read_register(&mut self, register: Register) -> Result<u8, I::Error> {
-        self.interface.write_command(register)?;
-        self.interface.read_data()
+        self.spi_interface.write_command(register)?;
+        self.spi_interface.read_data()
     }
 
     /// Read the status register.
@@ -71,7 +80,7 @@ impl<I: LT7683Interface, RESET: OutputPin> LT7683<I, RESET> {
     /// Bit 1: reserved
     /// Bit 0: Operation mode status
     pub fn read_status(&mut self) -> Result<u8, I::Error> {
-        self.interface.read_status()
+        self.spi_interface.read_status()
     }
 
     pub fn is_sdram_ready(&mut self) -> Result<bool, I::Error> {
@@ -112,13 +121,12 @@ impl<I: LT7683Interface, RESET: OutputPin> LT7683<I, RESET> {
     }
 
     pub fn init_color_bar_test<D: DelayNs>(&mut self, delay: &mut D) -> Result<(), I::Error> {
-        let timing = DisplayTiming::default_1024x600();
         self.hardware_reset(delay)?;
         self.software_reset(delay)?;
         self.configure_pll(delay)?;
         // TFT 24-bit output, SPI flash enabled, 8-bit host bus
         self.write_register(Register::Ccr, 0x80)?;
-        self.configure_display_timing(&timing)?;
+        self.configure_display_timing()?;
         // HSYNC high active, VSYNC high active, DE high active
         self.write_register(Register::Pcsr, 0xC0)?;
         // Display on with color bar
@@ -126,7 +134,8 @@ impl<I: LT7683Interface, RESET: OutputPin> LT7683<I, RESET> {
         Ok(())
     }
 
-    pub fn init<D: DelayNs>(&mut self, delay: &mut D, timing: &DisplayTiming) -> Result<(), I::Error> {
+    pub fn init<D: DelayNs>(&mut self, delay: &mut D, timing: &DisplayConfig) -> Result<(), I::Error> {
+
         self.hardware_reset(delay)?;
         self.software_reset(delay)?;
         self.configure_pll(delay)?;
@@ -138,7 +147,7 @@ impl<I: LT7683Interface, RESET: OutputPin> LT7683<I, RESET> {
         self.write_register(Register::Macr, 0x40)?;
         // Graphic mode, SDRAM memory
         self.write_register(Register::Icr, 0x00)?;
-        self.configure_display_timing(&timing)?;
+        self.configure_display_timing()?;
         // HSYNC high active, VSYNC high active, DE high active
         self.write_register(Register::Pcsr, 0xC0)?;
         self.configure_main_window(&timing)?;
@@ -184,32 +193,32 @@ impl<I: LT7683Interface, RESET: OutputPin> LT7683<I, RESET> {
         Ok(())
     }
 
-    fn configure_display_timing(&mut self, timing: &DisplayTiming) -> Result<(), I::Error> {
+    fn configure_display_timing(&mut self) -> Result<(), I::Error> {
         // Horizontal display width
-        self.write_register(Register::Hdwr, ((timing.width / 8) - 1) as u8)?;
-        self.write_register(Register::Hdwftr, (timing.width % 8) as u8)?;
+        self.write_register(Register::Hdwr, ((self.config.width / 8) - 1) as u8)?;
+        self.write_register(Register::Hdwftr, (self.config.width % 8) as u8)?;
         // Horizontal non-display period (back porch)
-        self.write_register(Register::Hndr, ((timing.h_back_porch / 8) - 1) as u8)?;
-        self.write_register(Register::Hndftr, (timing.h_back_porch % 8) as u8)?;
+        self.write_register(Register::Hndr, ((self.config.h_back_porch / 8) - 1) as u8)?;
+        self.write_register(Register::Hndftr, (self.config.h_back_porch % 8) as u8)?;
         // HSYNC start position (front porch - from end of display to start of HSYNC)
-        self.write_register(Register::Hstr, ((timing.h_front_porch / 8) - 1) as u8)?;
+        self.write_register(Register::Hstr, ((self.config.h_front_porch / 8) - 1) as u8)?;
         // HSYNC pulse width
-        self.write_register(Register::Hpwr, ((timing.h_sync_width / 8) - 1) as u8)?;
+        self.write_register(Register::Hpwr, ((self.config.h_sync_width / 8) - 1) as u8)?;
         // Vertical display height
-        let height_minus_1 = timing.height - 1;
+        let height_minus_1 = self.config.height - 1;
         self.write_register(Register::Vdhr1, (height_minus_1 & 0xFF) as u8)?;
         self.write_register(Register::Vdhr2, ((height_minus_1 >> 8) & 0xFF) as u8)?;
         // Vertical non-display period (back porch)
-        self.write_register(Register::Vndr1, (timing.v_back_porch - 1) as u8)?;
+        self.write_register(Register::Vndr1, (self.config.v_back_porch - 1) as u8)?;
         self.write_register(Register::Vndr2, 0x00)?;
         // VSYNC start position (front porch - from end of display to start of VSYNC)
-        self.write_register(Register::Vstr, (timing.v_front_porch - 1) as u8)?;
+        self.write_register(Register::Vstr, (self.config.v_front_porch - 1) as u8)?;
         // VSYNC pulse width
-        self.write_register(Register::Vpwr, (timing.v_sync_width - 1) as u8)?;
+        self.write_register(Register::Vpwr, (self.config.v_sync_width - 1) as u8)?;
         Ok(())
     }
 
-    fn configure_main_window(&mut self, timing: &DisplayTiming) -> Result<(), I::Error> {
+    fn configure_main_window(&mut self, timing: &DisplayConfig) -> Result<(), I::Error> {
         // Main/PIP window control: 16bpp color depth
         self.write_register(Register::Mpwctr, 0x04)?;
         // Main image start address = 0
@@ -306,8 +315,7 @@ impl<I: LT7683Interface, RESET: OutputPin> LT7683<I, RESET> {
 
    /// Clear entire screen with color.
    pub fn clear_screen(&mut self, color: u16) -> Result<(), I::Error> {
-        todo!();
-       // self.draw_filled_rectangle(0, 0, self.config.width - 1, self.config.height - 1, color)
+       self.draw_filled_rectangle(0, 0, self.config.width - 1, self.config.height - 1, color)
    }
 }
 
@@ -711,13 +719,6 @@ pub enum ColorDepth {
     Bpp16 = 0x01,
     /// 24-bit color (RGB 8:8:8).
     Bpp24 = 0x02,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct DisplayConfig {
-    pub width: u16,
-    pub height: u16,
-    pub color_depth: ColorDepth,
 }
 
 //pub struct LT7683<DATA, RS, WR, RD, CS, RES, DELAY> {
