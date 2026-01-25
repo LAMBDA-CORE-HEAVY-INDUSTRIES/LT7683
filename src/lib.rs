@@ -37,7 +37,7 @@ impl Default for DisplayConfig {
             v_back_porch: 23,
             v_front_porch: 12,
             v_sync_width: 10,
-            color_depth: ColorDepth::Bpp24,
+            color_depth: ColorDepth::Bpp16,
         }
     }
 }
@@ -264,22 +264,25 @@ impl<I: LT7683Interface, RESET: OutputPin> LT7683<I, RESET> {
    }
 
    pub fn set_foreground_color(&mut self, color: u16) -> Result<(), I::Error> {
-       // match self.config.color_depth {
-       //     ColorDepth::Bpp16 => {
-       //         // RGB565.
-       //         let r = ((color >> 11) & 0x1F) << 3; // Scale 5-bit to 8-bit.
-       //         let g = ((color >> 5) & 0x3F) << 2;  // Scale 6-bit to 8-bit.
-       //         let b = (color & 0x1F) << 3;         // Scale 5-bit to 8-bit.
-       //         self.write_register(Register::Fgcr, r as u8)?;
-       //         self.write_register(Register::Fgcg, g as u8)?;
-       //         self.write_register(Register::Fgcb, b as u8)?;
-       //     }
-       //     _ => {
-       //         self.write_register(Register::Fgcr, (color >> 8) as u8)?;
-       //         self.write_register(Register::Fgcg, color as u8)?;
-       //         self.write_register(Register::Fgcb, 0)?;
-       //     }
-       // }
+        match self.config.color_depth {
+            ColorDepth::Bpp16 => {
+                // RGB565.
+                let r = ((color >> 11) & 0x1F) << 3;
+                let g = ((color >> 5) & 0x3F) << 2;
+                let b = ((color >> 0) & 0x1F) << 3;
+                self.write_register(Register::Fgcr, r as u8)?;
+                self.write_register(Register::Fgcg, g as u8)?;
+                self.write_register(Register::Fgcb, b as u8)?;
+
+            }
+            _ => {
+                self.write_register(Register::Fgcr, (color >> 8) as u8)?;
+                self.write_register(Register::Fgcg, color as u8)?;
+                self.write_register(Register::Fgcb, 0)?;
+            }
+        }
+       Ok(())
+   }
        Ok(())
    }
 
