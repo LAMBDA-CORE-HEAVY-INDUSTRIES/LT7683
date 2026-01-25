@@ -134,8 +134,7 @@ impl<I: LT7683Interface, RESET: OutputPin> LT7683<I, RESET> {
         Ok(())
     }
 
-    pub fn init<D: DelayNs>(&mut self, delay: &mut D, timing: &DisplayConfig) -> Result<(), I::Error> {
-
+    pub fn init<D: DelayNs>(&mut self, delay: &mut D) -> Result<(), I::Error> {
         self.hardware_reset(delay)?;
         self.software_reset(delay)?;
         self.configure_pll(delay)?;
@@ -150,7 +149,7 @@ impl<I: LT7683Interface, RESET: OutputPin> LT7683<I, RESET> {
         self.configure_display_timing()?;
         // HSYNC high active, VSYNC high active, DE high active
         self.write_register(Register::Pcsr, 0xC0)?;
-        self.configure_main_window(&timing)?;
+        self.configure_main_window()?;
         // Display on
         self.write_register(Register::Dpcr, 0xC0)?;
         Ok(())
@@ -180,13 +179,11 @@ impl<I: LT7683Interface, RESET: OutputPin> LT7683<I, RESET> {
         // CAS latency 3
         self.write_register(Register::Sdrmd, 0x03)?;
 
-        // Refresh interval for 100MHz SDRAM clock
-        // Formula: ((64000000 / 8192) / (1000 / DRAM_FREQ_MHZ)) - 2
-        // For 100MHz: (64000000 / 8192) / 10 - 2 = 779 = 0x030B
-        // TODO: check if this makes sense
-        let sdram_itv: u16 = 779;
+        // TODO: Verify that this is correct. Do we want to configure this by user?
+        let sdram_itv: u16 = 0x030D;
         self.write_register(Register::SdrRef1, sdram_itv as u8)?;
         self.write_register(Register::SdrRef2, (sdram_itv >> 8) as u8)?;
+
         // Start SDRAM initialization
         self.write_register(Register::Sdrcr, 0x01)?;
         delay.delay_ms(10);
@@ -218,19 +215,18 @@ impl<I: LT7683Interface, RESET: OutputPin> LT7683<I, RESET> {
         Ok(())
     }
 
-    fn configure_main_window(&mut self, timing: &DisplayConfig) -> Result<(), I::Error> {
+    fn configure_main_window(&mut self) -> Result<(), I::Error> {
         // Main/PIP window control: 16bpp color depth
         self.write_register(Register::Mpwctr, 0x04)?;
-        // Main image start address = 0
+        // Main image start address
         self.write_register(Register::Misa1, 0x00)?;
         self.write_register(Register::Misa2, 0x00)?;
         self.write_register(Register::Misa3, 0x00)?;
         self.write_register(Register::Misa4, 0x00)?;
-        // Main image width in bytes (width * 2 for 16bpp)
-        let width_bytes = timing.width * 2;
-        self.write_register(Register::Miw1, (width_bytes & 0xFF) as u8)?;
-        self.write_register(Register::Miw2, ((width_bytes >> 8) & 0xFF) as u8)?;
-        // Main window upper-left corner at (0, 0)
+        let width = self.config.width;
+        self.write_register(Register::Miw1, (width & 0xFF) as u8)?;
+        self.write_register(Register::Miw2, ((width >> 8) & 0xFF) as u8)?;
+        // Main window upper-left corner
         self.write_register(Register::Mwulx1, 0x00)?;
         self.write_register(Register::Mwulx2, 0x00)?;
         self.write_register(Register::Mwuly1, 0x00)?;
@@ -240,12 +236,11 @@ impl<I: LT7683Interface, RESET: OutputPin> LT7683<I, RESET> {
         self.write_register(Register::Cvssa2, 0x00)?;
         self.write_register(Register::Cvssa3, 0x00)?;
         self.write_register(Register::Cvssa4, 0x00)?;
-        // Canvas image width
-        self.write_register(Register::CvsImwth1, (width_bytes & 0xFF) as u8)?;
-        self.write_register(Register::CvsImwth2, ((width_bytes >> 8) & 0xFF) as u8)?;
+        // Canvas image width in pixels
+        self.write_register(Register::CvsImwth1, (width & 0xFF) as u8)?;
+        self.write_register(Register::CvsImwth2, ((width >> 8) & 0xFF) as u8)?;
         // Active window
-        self.set_active_window(0, 0, timing.width, timing.height)?;
-        // Active window color depth: 16bpp
+        self.set_active_window(0, 0, self.config.width, self.config.height)?;
         self.write_register(Register::AwColor, 0x01)?;
         Ok(())
     }
@@ -283,36 +278,51 @@ impl<I: LT7683Interface, RESET: OutputPin> LT7683<I, RESET> {
         }
        Ok(())
    }
+
+   /// Wait for drawing engine to complete (check status bit 3 = core busy).
+   pub fn wait_busy_draw(&mut self) -> Result<(), I::Error> {
+       loop {
+           let status = self.read_status()?;
+           if (status & 0x08) == 0 {
+               break;
+           }
+       }
        Ok(())
    }
 
    pub fn draw_filled_rectangle(&mut self, x1: u16, y1: u16, x2: u16, y2: u16, color: u16) -> Result<(), I::Error> {
        self.set_foreground_color(color)?;
+        // Set start point
        self.write_register(Register::Dlhsr1, x1 as u8)?;
        self.write_register(Register::Dlhsr2, (x1 >> 8) as u8)?;
        self.write_register(Register::Dlvsr1, y1 as u8)?;
        self.write_register(Register::Dlvsr2, (y1 >> 8) as u8)?;
+       // Set end point
        self.write_register(Register::Dlher1, x2 as u8)?;
        self.write_register(Register::Dlher2, (x2 >> 8) as u8)?;
        self.write_register(Register::Dlver1, y2 as u8)?;
        self.write_register(Register::Dlver2, (y2 >> 8) as u8)?;
-       self.write_register(Register::Dcr0, 0xB0)?;
-       // self.delay.delay_ms(1);
+
+       self.write_register(Register::Dcr1, 0xE0)?;
+       self.wait_busy_draw()?;
        Ok(())
    }
 
    pub fn draw_line(&mut self, x1: u16, y1: u16, x2: u16, y2: u16, color: u16) -> Result<(), I::Error> {
        self.set_foreground_color(color)?;
+       // Set start point
        self.write_register(Register::Dlhsr1, x1 as u8)?;
        self.write_register(Register::Dlhsr2, (x1 >> 8) as u8)?;
        self.write_register(Register::Dlvsr1, y1 as u8)?;
        self.write_register(Register::Dlvsr2, (y1 >> 8) as u8)?;
+       // Set end point
        self.write_register(Register::Dlher1, x2 as u8)?;
        self.write_register(Register::Dlher2, (x2 >> 8) as u8)?;
        self.write_register(Register::Dlver1, y2 as u8)?;
        self.write_register(Register::Dlver2, (y2 >> 8) as u8)?;
+
        self.write_register(Register::Dcr0, 0x80)?;
-       // self.delay.delay_ms(1);
+       self.wait_busy_draw()?;
        Ok(())
    }
 

@@ -48,7 +48,14 @@ fn main() -> ! {
         let spi_interface = lt7683::SpiInterface { spi: spi_device };
         let display_config = DisplayConfig::new();
         let mut display = lt7683::LT7683::new(spi_interface, res, display_config);
-        display.init_color_bar_test(&mut delay).unwrap();
+        display.init(&mut delay).unwrap();
+        display.clear_screen(0x0000).unwrap();
+        display.draw_line(400, 100, 420, 300, 0xAAAA);
+        display.draw_line(900, 100, 1000, 200, 0x2222);
+        display.draw_line(600, 500, 600, 300, 0xBBBB);
+        display.draw_filled_rectangle(500, 500, 800, 300, 0xB2B2);
+        display.draw_filled_rectangle(200, 400, 300, 200, 0xFFFF);
+        display.draw_filled_rectangle(800, 100, 700, 150, 0x2222);
         loop {}
     }
     loop {}
