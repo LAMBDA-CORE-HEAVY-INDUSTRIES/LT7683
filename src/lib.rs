@@ -26,7 +26,7 @@ pub struct DisplayConfig {
 }
 
 impl Default for DisplayConfig {
-    /// Default timing for 7" 1024x600 display (ER-TFT070A2-6-5633).
+    /// Default config for 7" 1024x600 display (ER-TFT070A2-6-5633).
     fn default() -> Self {
         Self {
             width: 1024,
@@ -102,11 +102,10 @@ impl<I: LT7683Interface, RESET: OutputPin> LT7683<I, RESET> {
         let _ = self.res.set_low();
         delay.delay_ms(10);
         let _ = self.res.set_high();
-        delay.delay_ms(100); // Wait for chip to boot
+        delay.delay_ms(100);
         Ok(())
     }
 
-    /// Software reset and wait for completion.
     pub fn software_reset<D: DelayNs>(&mut self, delay: &mut D) -> Result<(), I::Error> {
         self.write_register(Register::Srr, 0x01)?;
         // Wait for reset to complete (bit 0 clears when done)
@@ -279,6 +278,29 @@ impl<I: LT7683Interface, RESET: OutputPin> LT7683<I, RESET> {
        Ok(())
    }
 
+   pub fn set_background_color(&mut self, color: u16) -> Result<(), I::Error> {
+        // TODO: refactor this with set_foreground_color()
+        match self.config.color_depth {
+            ColorDepth::Bpp16 => {
+                // RGB565.
+                let r = ((color >> 11) & 0x1F) << 3;
+                let g = ((color >> 5) & 0x3F) << 2;
+                let b = ((color >> 0) & 0x1F) << 3;
+                self.write_register(Register::Bgcr, r as u8)?;
+                self.write_register(Register::Bgcg, g as u8)?;
+                self.write_register(Register::Bgcb, b as u8)?;
+
+            }
+            _ => {
+                self.write_register(Register::Bgcr, (color >> 8) as u8)?;
+                self.write_register(Register::Bgcg, color as u8)?;
+                self.write_register(Register::Bgcb, 0)?;
+            }
+        }
+       Ok(())
+   }
+
+
    /// Wait for drawing engine to complete (check status bit 3 = core busy).
    pub fn wait_busy_draw(&mut self) -> Result<(), I::Error> {
        loop {
@@ -325,6 +347,27 @@ impl<I: LT7683Interface, RESET: OutputPin> LT7683<I, RESET> {
        self.wait_busy_draw()?;
        Ok(())
    }
+
+    pub fn write_text(&mut self, text: &str, x: u16, y: u16, bg_color: u16, fg_color: u16) -> Result<(), I::Error> {
+        // TODO: This is now hardcoded as Internal CGROM character.
+        // Make it user configurable, in case external one is desired.
+        self.write_register(Register::Ccr0, 0x00);
+        // NOTE: bit 6 could be desirable to be passed as arg:
+        // 0: Characters background displayed with specified color.
+        // 1: Characters background displayed with original canvas background.
+        self.write_register(Register::Ccr1, 0x00);
+        self.set_foreground_color(fg_color)?;
+        self.set_background_color(bg_color)?;
+        self.write_register(Register::Icr, 0x04)?;
+        self.write_register(Register::FCurx1, x as u8)?;
+        self.write_register(Register::FCurx2, (x >> 8) as u8)?;
+        self.write_register(Register::FCury1, y as u8)?;
+        self.write_register(Register::FCury2, (y >> 8) as u8)?;
+        for &char in text.as_bytes() {
+            self.write_register(Register::Mrwdp, char);
+        }
+        Ok(())
+    }
 
    /// Clear entire screen with color.
    pub fn clear_screen(&mut self, color: u16) -> Result<(), I::Error> {
