@@ -429,65 +429,54 @@ impl<I: LT7683Interface, RESET: OutputPin> LT7683<I, RESET> {
         Ok(())
     }
 
-}
+    pub fn bte_memory_copy(
+        &mut self,
+        src_x: u16, src_y: u16,
+        dst_x: u16, dst_y: u16,
+        width: u16, height: u16
+    ) -> Result<(), I::Error> {
+        let canvas_width = self.config.width;
+        // Set source 0 memory start address (canvas address = 0)
+        self.write_register(Register::S0Str0, 0x00)?;
+        self.write_register(Register::S0Str1, 0x00)?;
+        self.write_register(Register::S0Str2, 0x00)?;
+        self.write_register(Register::S0Str3, 0x00)?;
+        // Set source 0 image width
+        self.write_register(Register::S0Wth0, canvas_width as u8)?;
+        self.write_register(Register::S0Wth1, (canvas_width >> 8) as u8)?;
+        // Set source 0 X/Y coordinates
+        self.write_register(Register::S0X0, src_x as u8)?;
+        self.write_register(Register::S0X1, (src_x >> 8) as u8)?;
+        self.write_register(Register::S0Y0, src_y as u8)?;
+        self.write_register(Register::S0Y1, (src_y >> 8) as u8)?;
+        // Set destination memory start address
+        self.write_register(Register::DtStr0, 0x00)?;
+        self.write_register(Register::DtStr1, 0x00)?;
+        self.write_register(Register::DtStr2, 0x00)?;
+        self.write_register(Register::DtStr3, 0x00)?;
+        // Set destination image width
+        self.write_register(Register::DtWth0, canvas_width as u8)?;
+        self.write_register(Register::DtWth1, (canvas_width >> 8) as u8)?;
+        // Set destination X/Y coordinates
+        self.write_register(Register::DtX0, dst_x as u8)?;
+        self.write_register(Register::DtX1, (dst_x >> 8) as u8)?;
+        self.write_register(Register::DtY0, dst_y as u8)?;
+        self.write_register(Register::DtY1, (dst_y >> 8) as u8)?;
+        // Set BTE window width and height
+        self.write_register(Register::BteWth0, width as u8)?;
+        self.write_register(Register::BteWth1, (width >> 8) as u8)?;
+        self.write_register(Register::BteHig0, height as u8)?;
+        self.write_register(Register::BteHig1, (height >> 8) as u8)?;
 
-/// Parallel 8-bit interface
-pub struct ParallelInterface<DATA, RS, WR, RD, CS> {
-    pub data: DATA,
-    pub rs: RS,
-    pub wr: WR,
-    pub rd: RD,
-    pub cs: CS,
-}
+        // TODO: This needs to be corrected.
+        self.write_register(Register::BteColr, self.config.color_depth as u8)?;
 
-impl<DATA, RS, WR, RD, CS, E> LT7683Interface for ParallelInterface<DATA, RS, WR, RD, CS>
-where
-    DATA: ParallelBus<Error = E>,
-    RS: OutputPin,
-    WR: OutputPin,
-    RD: OutputPin,
-    CS: OutputPin,
-{
-    type Error = E;
-
-    fn write_command(&mut self, register: Register) -> Result<(), Self::Error> {
-        let _ = self.rs.set_low();
-        let _ = self.rd.set_high();
-        self.data.write(register as u8);
-        let _ = self.wr.set_low();
-        let _ = self.wr.set_high();
+        // BTE memory copy with ROP
+        self.write_register(Register::BteCtrl1, 0xC2)?;
+        // Enable BTE write
+        self.write_register(Register::BteCtrl0, 0x10)?;
+        self.wait_bte_complete()?;
         Ok(())
-    }
-
-    fn write_data(&mut self, data: u8) -> Result<(), Self::Error> {
-        let _ = self.rs.set_high();
-        let _ = self.rd.set_high();
-        self.data.write(data);
-        let _ = self.wr.set_low();
-        let _ = self.wr.set_high();
-        Ok(())
-    }
-
-    fn read_data(&mut self) -> Result<u8, E> {
-        let _ = self.rs.set_high();
-        let _ = self.wr.set_high();
-        self.data.set_input();
-        let _ = self.rd.set_low();
-        let result = self.data.read()?;
-        let _ = self.rd.set_high();
-        self.data.set_output();
-        Ok(result)
-    }
-
-    fn read_status(&mut self) -> Result<u8, E> {
-        let _ = self.rs.set_low();
-        let _ = self.wr.set_high();
-        self.data.set_input();
-        let _ = self.rd.set_low();
-        let result = self.data.read()?;
-        let _ = self.rd.set_high();
-        self.data.set_output();
-        Ok(result)
     }
 }
 
@@ -904,230 +893,4 @@ pub enum ColorDepth {
     Bpp16 = 0x01,
     /// 24-bit color (RGB 8:8:8).
     Bpp24 = 0x02,
-}
-
-//pub struct LT7683<DATA, RS, WR, RD, CS, RES, DELAY> {
-//    /// DB0 to DB7.
-//    data: DATA,
-//    /// aka A0
-//    /// 1 = data read/write mode.
-//    /// 0 = status read/command write mode. 
-//    rs: RS,
-//    /// active-LOW data write.
-//    wr: WR,
-//    /// active-LOW data read.
-//    rd: RD,
-//    /// Active-LOW to enable LT7683.
-//    cs: CS,
-//    /// Active-LOW hardware reset.
-//    res: RES,
-//    delay: DELAY,
-//    config: DisplayConfig,
-//}
-
-//impl<DATA, RS, WR, RD, CS, RES, DELAY, E> LT7683<DATA, RS, WR, RD, CS, RES, DELAY>
-//where
-//    DATA: ParallelBus<Error = E>,
-//    RS: OutputPin,
-//    WR: OutputPin,
-//    RD: OutputPin,
-//    CS: OutputPin,
-//    RES: OutputPin,
-//    DELAY: DelayNs,
-//{
-//    pub fn new(data: DATA, rs: RS, wr: WR, rd: RD, cs: CS, res: RES, delay: DELAY, config: DisplayConfig) -> Result<Self, E> {
-//        let mut display = Self {
-//            data, rs, wr, rd, cs, res, delay, config,
-//        };
-//        display.cs.set_low();
-//        display.hardware_reset()?;
-//        display.init_display()?;
-//        Ok(display)
-//    }
-
-//    pub fn init_display(&mut self) -> Result<(), E> {
-//        // self.write_register(Register::Dpcr, 0x05)?; // test color bar
-//        self.write_register(Register::Srr, 0x01)?;
-//        self.delay.delay_ms(10);
-
-//        // 8-bit parallel interface mode.
-//        // self.write_register(Register::Ccr, 0x00)?;
-
-//        // self.configure_pll()?;
-//        // self.configure_display_timing()?;
-//        // self.configure_memory()?;
-//        // self.set_active_window(0, 0, self.config.width, self.config.height)?;
-//        // self.clear_screen(0x0000)?;
-//        Ok(())
-//    }
-
-//    fn configure_pll(&mut self) -> Result<(), E> {
-//        // Pixel clock.
-//        self.write_register(Register::Ppllc1, 0x07)?;
-//        self.write_register(Register::Ppllc2, 0x03)?;
-//        // Memory clock.
-//        self.write_register(Register::Mpllc1, 0x05)?;
-//        self.write_register(Register::Mpllc2, 0x03)?;
-//        // Core clock.
-//        self.write_register(Register::Cpllc1, 0x03)?;
-//        self.write_register(Register::Cpllc2, 0x02)?;
-//        self.delay.delay_ms(10);
-//        Ok(())
-//    }
-
-//    fn configure_display_timing(&mut self) -> Result<(), E> {
-//        let width = self.config.width;
-//        let height = self.config.height;
-//        self.write_register(Register::Hdwr, ((width / 8) - 1) as u8)?;
-//        self.write_register(Register::Hdwftr, (width % 8) as u8)?;
-//        self.write_register(Register::Hndr, 0x05)?;
-//        self.write_register(Register::Hndftr, 0x00)?;
-//        self.write_register(Register::Hstr, 0x01)?;
-//        self.write_register(Register::Hpwr, 0x03)?;
-
-//        self.write_register(Register::Vdhr1, (height - 1) as u8)?;
-//        self.write_register(Register::Vdhr2, ((height - 1) >> 8) as u8)?;
-//        self.write_register(Register::Vndr1, 0x12)?;
-//        self.write_register(Register::Vndr2, 0x00)?;
-//        self.write_register(Register::Vstr, 0x01)?;
-//        self.write_register(Register::Vpwr, 0x05)?;
-
-//        self.write_register(Register::Dpcr, 0x00)?; // Display on
-//        Ok(())
-//    }
-
-//    fn configure_memory(&mut self) -> Result<(), E> {
-//        self.write_register(Register::AwColor, self.config.color_depth as u8)?;
-//        self.write_register(Register::Misa1, 0x00)?;
-//        self.write_register(Register::Misa2, 0x00)?;
-//        self.write_register(Register::Misa3, 0x00)?;
-//        self.write_register(Register::Misa4, 0x00)?;
-//        let width_bytes = self.config.width * (self.config.color_depth as u16 + 1);
-//        self.write_register(Register::Miw1, width_bytes as u8)?;
-//        self.write_register(Register::Miw2, (width_bytes >> 8) as u8)?;
-//        Ok(())
-//    }
-
-//    pub fn set_active_window(&mut self, x: u16, y: u16, width: u16, height: u16) -> Result<(), E> {
-//        self.write_register(Register::AwulX1, x as u8)?;
-//        self.write_register(Register::AwulX2, (x >> 8) as u8)?;
-//        self.write_register(Register::AwulY1, y as u8)?;
-//        self.write_register(Register::AwulY2, (y >> 8) as u8)?;
-
-//        self.write_register(Register::AwWth1, width as u8)?;
-//        self.write_register(Register::AwWth2, (width >> 8) as u8)?;
-//        self.write_register(Register::AwHt1, height as u8)?;
-//        self.write_register(Register::AwHt2, (height >> 8) as u8)?;
-//        Ok(())
-//    }
-
-//    pub fn set_foreground_color(&mut self, color: u16) -> Result<(), E> {
-//        match self.config.color_depth {
-//            ColorDepth::Bpp16 => {
-//                // RGB565.
-//                let r = ((color >> 11) & 0x1F) << 3; // Scale 5-bit to 8-bit.
-//                let g = ((color >> 5) & 0x3F) << 2;  // Scale 6-bit to 8-bit.
-//                let b = (color & 0x1F) << 3;         // Scale 5-bit to 8-bit.
-//                self.write_register(Register::Fgcr, r as u8)?;
-//                self.write_register(Register::Fgcg, g as u8)?;
-//                self.write_register(Register::Fgcb, b as u8)?;
-//            }
-//            _ => {
-//                self.write_register(Register::Fgcr, (color >> 8) as u8)?;
-//                self.write_register(Register::Fgcg, color as u8)?;
-//                self.write_register(Register::Fgcb, 0)?;
-//            }
-//        }
-//        Ok(())
-//    }
-
-//    pub fn draw_filled_rectangle(&mut self, x1: u16, y1: u16, x2: u16, y2: u16, color: u16) -> Result<(), E> {
-//        self.set_foreground_color(color)?;
-//        self.write_register(Register::Dlhsr1, x1 as u8)?;
-//        self.write_register(Register::Dlhsr2, (x1 >> 8) as u8)?;
-//        self.write_register(Register::Dlvsr1, y1 as u8)?;
-//        self.write_register(Register::Dlvsr2, (y1 >> 8) as u8)?;
-//        self.write_register(Register::Dlher1, x2 as u8)?;
-//        self.write_register(Register::Dlher2, (x2 >> 8) as u8)?;
-//        self.write_register(Register::Dlver1, y2 as u8)?;
-//        self.write_register(Register::Dlver2, (y2 >> 8) as u8)?;
-//        self.write_register(Register::Dcr0, 0xB0)?;
-//        // self.delay.delay_ms(1);
-//        Ok(())
-//    }
-
-//    pub fn draw_line(&mut self, x1: u16, y1: u16, x2: u16, y2: u16, color: u16) -> Result<(), E> {
-//        self.set_foreground_color(color)?;
-//        self.write_register(Register::Dlhsr1, x1 as u8)?;
-//        self.write_register(Register::Dlhsr2, (x1 >> 8) as u8)?;
-//        self.write_register(Register::Dlvsr1, y1 as u8)?;
-//        self.write_register(Register::Dlvsr2, (y1 >> 8) as u8)?;
-//        self.write_register(Register::Dlher1, x2 as u8)?;
-//        self.write_register(Register::Dlher2, (x2 >> 8) as u8)?;
-//        self.write_register(Register::Dlver1, y2 as u8)?;
-//        self.write_register(Register::Dlver2, (y2 >> 8) as u8)?;
-//        self.write_register(Register::Dcr0, 0x80)?;
-//        // self.delay.delay_ms(1);
-//        Ok(())
-//    }
-
-//    /// Clear entire screen with color.
-//    pub fn clear_screen(&mut self, color: u16) -> Result<(), E> {
-//        self.draw_filled_rectangle(0, 0, self.config.width - 1, self.config.height - 1, color)
-//    }
-
-//    pub fn write_register(&mut self, register: Register, data: u8) -> Result<(), E> {
-//        self.write_command(register)?;
-//        self.write_data(data)?;
-//        Ok(())
-//    }
-
-//    pub fn write_command(&mut self, reg_addr: Register) -> Result<(), E> {
-//        self.rd.set_high();
-//        self.rs.set_low();
-//        self.data.write(reg_addr as u8);
-//        self.delay.delay_ns(10);
-//        self.wr.set_low();
-//        self.delay.delay_ns(150);
-//        self.wr.set_high();
-//        Ok(())
-//    }
-
-//    pub fn write_data(&mut self, data: u8) -> Result<(), E> {
-//        self.rd.set_high();
-//        self.rs.set_high();
-//        self.data.write(data);
-//        self.delay.delay_ns(10);
-//        self.wr.set_low();
-//        self.delay.delay_ns(150);
-//        self.wr.set_high();
-//        Ok(())
-//    }
-
-//    pub fn read_data(&mut self) -> Result<u8, E> {
-//        todo!();
-//    }
-
-//    pub fn read_status(&mut self) {
-//        //TODO: page 131 https://www.buydisplay.com/download/ic/LT7683.pdf
-//        todo!();
-//    }
-
-//    fn hardware_reset(&mut self) -> Result<(), E> {
-//        self.res.set_low();
-//        self.delay.delay_ms(10);
-//        self.res.set_high();
-//        self.delay.delay_ms(3);
-//        Ok(())
-//    }
-//}
-
-
-pub trait ParallelBus {
-    type Error;
-
-    fn write(&mut self, value: u8) -> ();
-    fn read(&mut self) -> Result<u8, Self::Error>;
-    fn set_input(&mut self) -> ();
-    fn set_output(&mut self) -> ();
 }
