@@ -348,16 +348,22 @@ impl<I: LT7683Interface, RESET: OutputPin> LT7683<I, RESET> {
        Ok(())
    }
 
-    pub fn write_text(&mut self, text: &str, x: u16, y: u16, bg_color: u16, fg_color: u16) -> Result<(), I::Error> {
+    /// When bg_color is not provided, characters background will be canvas background.
+    pub fn write_text(&mut self, text: &str, x: u16, y: u16, bg_color: Option<u16>, fg_color: u16) -> Result<(), I::Error> {
         // TODO: This is now hardcoded as Internal CGROM character.
         // Make it user configurable, in case external one is desired.
+        // This also controls the size (8x16, 12x24, 16x32)
         self.write_register(Register::Ccr0, 0x00);
-        // NOTE: bit 6 could be desirable to be passed as arg:
-        // 0: Characters background displayed with specified color.
-        // 1: Characters background displayed with original canvas background.
-        self.write_register(Register::Ccr1, 0x00);
+        match bg_color {
+            Some(bg_color) => {
+                self.write_register(Register::Ccr1, 0x00);
+                self.set_background_color(bg_color)?
+            },
+            None => {
+                self.write_register(Register::Ccr1, 0x40);
+            }
+        }
         self.set_foreground_color(fg_color)?;
-        self.set_background_color(bg_color)?;
         self.write_register(Register::Icr, 0x04)?;
         self.write_register(Register::FCurx1, x as u8)?;
         self.write_register(Register::FCurx2, (x >> 8) as u8)?;
