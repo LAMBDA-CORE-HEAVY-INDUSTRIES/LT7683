@@ -240,116 +240,106 @@ impl<I: LT7683Interface, RESET: OutputPin> LT7683<I, RESET> {
         self.write_register(Register::CvsImwth2, ((width >> 8) & 0xFF) as u8)?;
         // Active window
         self.set_active_window(0, 0, self.config.width, self.config.height)?;
-        self.write_register(Register::AwColor, 0x01)?;
+        self.write_register(Register::AwColor, self.config.color_depth as u8)?;
         Ok(())
     }
 
-   pub fn set_active_window(&mut self, x: u16, y: u16, width: u16, height: u16) -> Result<(), I::Error> {
-       self.write_register(Register::AwulX1, x as u8)?;
-       self.write_register(Register::AwulX2, (x >> 8) as u8)?;
-       self.write_register(Register::AwulY1, y as u8)?;
-       self.write_register(Register::AwulY2, (y >> 8) as u8)?;
+    pub fn set_active_window(&mut self, x: u16, y: u16, width: u16, height: u16) -> Result<(), I::Error> {
+        self.write_register(Register::AwulX1, x as u8)?;
+        self.write_register(Register::AwulX2, (x >> 8) as u8)?;
+        self.write_register(Register::AwulY1, y as u8)?;
+        self.write_register(Register::AwulY2, (y >> 8) as u8)?;
 
-       self.write_register(Register::AwWth1, width as u8)?;
-       self.write_register(Register::AwWth2, (width >> 8) as u8)?;
-       self.write_register(Register::AwHt1, height as u8)?;
-       self.write_register(Register::AwHt2, (height >> 8) as u8)?;
-       Ok(())
-   }
+        self.write_register(Register::AwWth1, width as u8)?;
+        self.write_register(Register::AwWth2, (width >> 8) as u8)?;
+        self.write_register(Register::AwHt1, height as u8)?;
+        self.write_register(Register::AwHt2, (height >> 8) as u8)?;
+        Ok(())
+    }
 
-   pub fn set_foreground_color(&mut self, color: u16) -> Result<(), I::Error> {
+    pub fn set_foreground_color(&mut self, color: u32) -> Result<(), I::Error> {
+        self.set_color_registers(color, Register::Fgcr, Register::Fgcg, Register::Fgcb)
+    }
+
+    pub fn set_background_color(&mut self, color: u32) -> Result<(), I::Error> {
+        self.set_color_registers(color, Register::Bgcr, Register::Bgcg, Register::Bgcb)
+    }
+
+    fn set_color_registers(&mut self, color: u32, reg_r: Register, reg_g: Register, reg_b: Register) -> Result<(), I::Error> {
+        // Input: 0x00RRGGBB (8 bits per channel)
+        let r = ((color >> 16) & 0xFF) as u8;
+        let g = ((color >> 8) & 0xFF) as u8;
+        let b = (color & 0xFF) as u8;
         match self.config.color_depth {
-            ColorDepth::Bpp16 => {
-                // RGB565.
-                let r = ((color >> 11) & 0x1F) << 3;
-                let g = ((color >> 5) & 0x3F) << 2;
-                let b = ((color >> 0) & 0x1F) << 3;
-                self.write_register(Register::Fgcr, r as u8)?;
-                self.write_register(Register::Fgcg, g as u8)?;
-                self.write_register(Register::Fgcb, b as u8)?;
-
+            ColorDepth::Bpp8 => {
+                self.write_register(reg_r, r & 0xE0)?;
+                self.write_register(reg_g, g & 0xE0)?;
+                self.write_register(reg_b, b & 0xC0)?;
             }
-            _ => {
-                self.write_register(Register::Fgcr, (color >> 8) as u8)?;
-                self.write_register(Register::Fgcg, color as u8)?;
-                self.write_register(Register::Fgcb, 0)?;
+            ColorDepth::Bpp16 => {
+                self.write_register(reg_r, r & 0xF8)?;
+                self.write_register(reg_g, g & 0xFC)?;
+                self.write_register(reg_b, b & 0xF8)?;
+            }
+            ColorDepth::Bpp24 => {
+                self.write_register(reg_r, r)?;
+                self.write_register(reg_g, g)?;
+                self.write_register(reg_b, b)?;
             }
         }
-       Ok(())
-   }
+        Ok(())
+    }
 
-   pub fn set_background_color(&mut self, color: u16) -> Result<(), I::Error> {
-        // TODO: refactor this with set_foreground_color()
-        match self.config.color_depth {
-            ColorDepth::Bpp16 => {
-                // RGB565.
-                let r = ((color >> 11) & 0x1F) << 3;
-                let g = ((color >> 5) & 0x3F) << 2;
-                let b = ((color >> 0) & 0x1F) << 3;
-                self.write_register(Register::Bgcr, r as u8)?;
-                self.write_register(Register::Bgcg, g as u8)?;
-                self.write_register(Register::Bgcb, b as u8)?;
 
-            }
-            _ => {
-                self.write_register(Register::Bgcr, (color >> 8) as u8)?;
-                self.write_register(Register::Bgcg, color as u8)?;
-                self.write_register(Register::Bgcb, 0)?;
+    /// Wait for drawing engine to complete (check status bit 3 = core busy).
+    pub fn wait_busy_draw(&mut self) -> Result<(), I::Error> {
+        loop {
+            let status = self.read_status()?;
+            if (status & 0x08) == 0 {
+                break;
             }
         }
-       Ok(())
-   }
+        Ok(())
+    }
 
-
-   /// Wait for drawing engine to complete (check status bit 3 = core busy).
-   pub fn wait_busy_draw(&mut self) -> Result<(), I::Error> {
-       loop {
-           let status = self.read_status()?;
-           if (status & 0x08) == 0 {
-               break;
-           }
-       }
-       Ok(())
-   }
-
-   pub fn draw_filled_rectangle(&mut self, x1: u16, y1: u16, x2: u16, y2: u16, color: u16) -> Result<(), I::Error> {
-       self.set_foreground_color(color)?;
+    pub fn draw_filled_rectangle(&mut self, x1: u16, y1: u16, x2: u16, y2: u16, color: u32) -> Result<(), I::Error> {
+        self.set_foreground_color(color)?;
         // Set start point
-       self.write_register(Register::Dlhsr1, x1 as u8)?;
-       self.write_register(Register::Dlhsr2, (x1 >> 8) as u8)?;
-       self.write_register(Register::Dlvsr1, y1 as u8)?;
-       self.write_register(Register::Dlvsr2, (y1 >> 8) as u8)?;
-       // Set end point
-       self.write_register(Register::Dlher1, x2 as u8)?;
-       self.write_register(Register::Dlher2, (x2 >> 8) as u8)?;
-       self.write_register(Register::Dlver1, y2 as u8)?;
-       self.write_register(Register::Dlver2, (y2 >> 8) as u8)?;
+        self.write_register(Register::Dlhsr1, x1 as u8)?;
+        self.write_register(Register::Dlhsr2, (x1 >> 8) as u8)?;
+        self.write_register(Register::Dlvsr1, y1 as u8)?;
+        self.write_register(Register::Dlvsr2, (y1 >> 8) as u8)?;
+        // Set end point
+        self.write_register(Register::Dlher1, x2 as u8)?;
+        self.write_register(Register::Dlher2, (x2 >> 8) as u8)?;
+        self.write_register(Register::Dlver1, y2 as u8)?;
+        self.write_register(Register::Dlver2, (y2 >> 8) as u8)?;
 
-       self.write_register(Register::Dcr1, 0xE0)?;
-       self.wait_busy_draw()?;
-       Ok(())
-   }
+        self.write_register(Register::Dcr1, 0xE0)?;
+        self.wait_busy_draw()?;
+        Ok(())
+    }
 
-   pub fn draw_line(&mut self, x1: u16, y1: u16, x2: u16, y2: u16, color: u16) -> Result<(), I::Error> {
-       self.set_foreground_color(color)?;
-       // Set start point
-       self.write_register(Register::Dlhsr1, x1 as u8)?;
-       self.write_register(Register::Dlhsr2, (x1 >> 8) as u8)?;
-       self.write_register(Register::Dlvsr1, y1 as u8)?;
-       self.write_register(Register::Dlvsr2, (y1 >> 8) as u8)?;
-       // Set end point
-       self.write_register(Register::Dlher1, x2 as u8)?;
-       self.write_register(Register::Dlher2, (x2 >> 8) as u8)?;
-       self.write_register(Register::Dlver1, y2 as u8)?;
-       self.write_register(Register::Dlver2, (y2 >> 8) as u8)?;
+    pub fn draw_line(&mut self, x1: u16, y1: u16, x2: u16, y2: u16, color: u32) -> Result<(), I::Error> {
+        self.set_foreground_color(color)?;
+        // Set start point
+        self.write_register(Register::Dlhsr1, x1 as u8)?;
+        self.write_register(Register::Dlhsr2, (x1 >> 8) as u8)?;
+        self.write_register(Register::Dlvsr1, y1 as u8)?;
+        self.write_register(Register::Dlvsr2, (y1 >> 8) as u8)?;
+        // Set end point
+        self.write_register(Register::Dlher1, x2 as u8)?;
+        self.write_register(Register::Dlher2, (x2 >> 8) as u8)?;
+        self.write_register(Register::Dlver1, y2 as u8)?;
+        self.write_register(Register::Dlver2, (y2 >> 8) as u8)?;
 
-       self.write_register(Register::Dcr0, 0x80)?;
-       self.wait_busy_draw()?;
-       Ok(())
-   }
+        self.write_register(Register::Dcr0, 0x80)?;
+        self.wait_busy_draw()?;
+        Ok(())
+    }
 
     /// When bg_color is not provided, characters background will be the canvas background.
-    pub fn write_text(&mut self, text: &str, x: u16, y: u16, bg_color: Option<u16>, fg_color: u16) -> Result<(), I::Error> {
+    pub fn write_text(&mut self, text: &str, x: u16, y: u16, bg_color: Option<u32>, fg_color: u32) -> Result<(), I::Error> {
         self.write_text_scaled(text, x, y, bg_color, fg_color, 1, 1)
     }
 
@@ -357,7 +347,7 @@ impl<I: LT7683Interface, RESET: OutputPin> LT7683<I, RESET> {
     /// scale_x and scale_y: 1-4 (1 = normal size, 2 = 2x, 3 = 3x, 4 = 4x).
     pub fn write_text_scaled(
         &mut self, text: &str, x: u16, y: u16,
-        bg_color: Option<u16>, fg_color: u16, scale_x: u8, scale_y: u8
+        bg_color: Option<u32>, fg_color: u32, scale_x: u8, scale_y: u8
     ) -> Result<(), I::Error> {
         // TODO: This is now hardcoded as Internal CGROM character.
         // Make it user configurable, in case external one is desired.
@@ -389,10 +379,10 @@ impl<I: LT7683Interface, RESET: OutputPin> LT7683<I, RESET> {
     }
 
 
-   /// Clear entire screen with color.
-   pub fn clear_screen(&mut self, color: u16) -> Result<(), I::Error> {
-       self.draw_filled_rectangle(0, 0, self.config.width - 1, self.config.height - 1, color)
-   }
+    /// Clear entire screen with color.
+    pub fn clear_screen(&mut self, color: u32) -> Result<(), I::Error> {
+        self.draw_filled_rectangle(0, 0, self.config.width - 1, self.config.height - 1, color)
+    }
 }
 
 /// Parallel 8-bit interface
