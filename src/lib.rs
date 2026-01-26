@@ -348,19 +348,32 @@ impl<I: LT7683Interface, RESET: OutputPin> LT7683<I, RESET> {
        Ok(())
    }
 
-    /// When bg_color is not provided, characters background will be canvas background.
+    /// When bg_color is not provided, characters background will be the canvas background.
     pub fn write_text(&mut self, text: &str, x: u16, y: u16, bg_color: Option<u16>, fg_color: u16) -> Result<(), I::Error> {
+        self.write_text_scaled(text, x, y, bg_color, fg_color, 1, 1)
+    }
+
+    /// When bg_color is not provided, characters background will be the canvas background.
+    /// scale_x and scale_y: 1-4 (1 = normal size, 2 = 2x, 3 = 3x, 4 = 4x).
+    pub fn write_text_scaled(
+        &mut self, text: &str, x: u16, y: u16,
+        bg_color: Option<u16>, fg_color: u16, scale_x: u8, scale_y: u8
+    ) -> Result<(), I::Error> {
         // TODO: This is now hardcoded as Internal CGROM character.
         // Make it user configurable, in case external one is desired.
         // This also controls the size (8x16, 12x24, 16x32)
-        self.write_register(Register::Ccr0, 0x00);
+        self.write_register(Register::Ccr0, 0x00)?;
+
+        let scale_x_bits = (scale_x.saturating_sub(1).min(3)) & 0x03;
+        let scale_y_bits = (scale_y.saturating_sub(1).min(3)) & 0x03;
+        let scale_bits = (scale_y_bits << 2) | scale_x_bits;
         match bg_color {
             Some(bg_color) => {
-                self.write_register(Register::Ccr1, 0x00);
+                self.write_register(Register::Ccr1, scale_bits)?;
                 self.set_background_color(bg_color)?
             },
             None => {
-                self.write_register(Register::Ccr1, 0x40);
+                self.write_register(Register::Ccr1, 0x40 | scale_bits)?;
             }
         }
         self.set_foreground_color(fg_color)?;
@@ -370,10 +383,11 @@ impl<I: LT7683Interface, RESET: OutputPin> LT7683<I, RESET> {
         self.write_register(Register::FCury1, y as u8)?;
         self.write_register(Register::FCury2, (y >> 8) as u8)?;
         for &char in text.as_bytes() {
-            self.write_register(Register::Mrwdp, char);
+            self.write_register(Register::Mrwdp, char)?;
         }
         Ok(())
     }
+
 
    /// Clear entire screen with color.
    pub fn clear_screen(&mut self, color: u16) -> Result<(), I::Error> {
