@@ -290,7 +290,6 @@ impl<I: LT7683Interface, RESET: OutputPin> LT7683<I, RESET> {
         Ok(())
     }
 
-
     /// Wait for drawing engine to complete (check status bit 3 = core busy).
     pub fn wait_busy_draw(&mut self) -> Result<(), I::Error> {
         loop {
@@ -378,11 +377,58 @@ impl<I: LT7683Interface, RESET: OutputPin> LT7683<I, RESET> {
         Ok(())
     }
 
-
     /// Clear entire screen with color.
     pub fn clear_screen(&mut self, color: u32) -> Result<(), I::Error> {
         self.draw_filled_rectangle(0, 0, self.config.width - 1, self.config.height - 1, color)
     }
+
+    /// Wait for BTE engine to complete (check status bit 6 = BTE busy).
+    pub fn wait_bte_complete(&mut self) -> Result<(), I::Error> {
+        loop {
+            let status = self.read_status()?;
+            if (status & 0x40) == 0 {
+                break;
+            }
+        }
+        Ok(())
+    }
+
+    /// Fill a rectangular area with a solid color using BTE.
+    /// This is faster than draw_filled_rectangle for large areas.
+    pub fn bte_solid_fill(&mut self, x: u16, y: u16, width: u16, height: u16, color: u32) -> Result<(), I::Error> {
+        self.set_foreground_color(color)?;
+        // Set destination memory start address (canvas address = 0)
+        self.write_register(Register::DtStr0, 0x00)?;
+        self.write_register(Register::DtStr1, 0x00)?;
+        self.write_register(Register::DtStr2, 0x00)?;
+        self.write_register(Register::DtStr3, 0x00)?;
+        // Set destination X/Y coordinates
+        self.write_register(Register::DtX0, x as u8)?;
+        self.write_register(Register::DtX1, (x >> 8) as u8)?;
+        self.write_register(Register::DtY0, y as u8)?;
+        self.write_register(Register::DtY1, (y >> 8) as u8)?;
+
+        // TODO: This needs to be corrected.
+        self.write_register(Register::BteColr, self.config.color_depth as u8)?;
+
+        // Set destination image width
+        let canvas_width = self.config.width;
+        self.write_register(Register::DtWth0, canvas_width as u8)?;
+        self.write_register(Register::DtWth1, (canvas_width >> 8) as u8)?;
+        // Set BTE window width and height
+        self.write_register(Register::BteWth0, width as u8)?;
+        self.write_register(Register::BteWth1, (width >> 8) as u8)?;
+        self.write_register(Register::BteHig0, height as u8)?;
+        self.write_register(Register::BteHig1, (height >> 8) as u8)?;
+
+        // BTE Solid fill
+        self.write_register(Register::BteCtrl1, 0x0C)?;
+        // Enable BTE write
+        self.write_register(Register::BteCtrl0, 0x10)?;
+        self.wait_bte_complete()?;
+        Ok(())
+    }
+
 }
 
 /// Parallel 8-bit interface
@@ -721,7 +767,80 @@ pub enum Register {
     // TODO: page 165 https://www.buydisplay.com/download/ic/LT7683.pdf
 
     // Bit block transfer engine (BTE) control registers:
-    // TODO: page 168 https://www.buydisplay.com/download/ic/LT7683.pdf
+    /// BTE Control Register 0.
+    BteCtrl0 = 0x90,
+    /// BTE Control Register 1.
+    BteCtrl1 = 0x91,
+    /// BTE Color Depth Register.
+    BteColr = 0x92,
+    /// Source 0 Memory Start Address 0.
+    S0Str0 = 0x93,
+    /// Source 0 Memory Start Address 1.
+    S0Str1 = 0x94,
+    /// Source 0 Memory Start Address 2.
+    S0Str2 = 0x95,
+    /// Source 0 Memory Start Address 3.
+    S0Str3 = 0x96,
+    /// Source 0 Image Width 0.
+    S0Wth0 = 0x97,
+    /// Source 0 Image Width 1.
+    S0Wth1 = 0x98,
+    /// Source 0 X-Coordinate 0.
+    S0X0 = 0x99,
+    /// Source 0 X-Coordinate 1.
+    S0X1 = 0x9A,
+    /// Source 0 Y-Coordinate 0.
+    S0Y0 = 0x9B,
+    /// Source 0 Y-Coordinate 1.
+    S0Y1 = 0x9C,
+    /// Source 1 Memory Start Address 0.
+    S1Str0 = 0x9D,
+    /// Source 1 Memory Start Address 1.
+    S1Str1 = 0x9E,
+    /// Source 1 Memory Start Address 2.
+    S1Str2 = 0x9F,
+    /// Source 1 Memory Start Address 3.
+    S1Str3 = 0xA0,
+    /// Source 1 Image Width 0.
+    S1Wth0 = 0xA1,
+    /// Source 1 Image Width 1.
+    S1Wth1 = 0xA2,
+    /// Source 1 X-Coordinate 0.
+    S1X0 = 0xA3,
+    /// Source 1 X-Coordinate 1.
+    S1X1 = 0xA4,
+    /// Source 1 Y-Coordinate 0.
+    S1Y0 = 0xA5,
+    /// Source 1 Y-Coordinate 1.
+    S1Y1 = 0xA6,
+    /// Destination Memory Start Address 0.
+    DtStr0 = 0xA7,
+    /// Destination Memory Start Address 1.
+    DtStr1 = 0xA8,
+    /// Destination Memory Start Address 2.
+    DtStr2 = 0xA9,
+    /// Destination Memory Start Address 3.
+    DtStr3 = 0xAA,
+    /// Destination Image Width 0.
+    DtWth0 = 0xAB,
+    /// Destination Image Width 1.
+    DtWth1 = 0xAC,
+    /// Destination X-Coordinate 0.
+    DtX0 = 0xAD,
+    /// Destination X-Coordinate 1.
+    DtX1 = 0xAE,
+    /// Destination Y-Coordinate 0.
+    DtY0 = 0xAF,
+    /// Destination Y-Coordinate 1.
+    DtY1 = 0xB0,
+    /// BTE Window Width 0.
+    BteWth0 = 0xB1,
+    /// BTE Window Width 1.
+    BteWth1 = 0xB2,
+    /// BTE Window Height 0.
+    BteHig0 = 0xB3,
+    /// BTE Window Height 1.
+    BteHig1 = 0xB4,
 
     // Serial Flash & SPI Master Control Registers:
     // TODO: page 176 https://www.buydisplay.com/download/ic/LT7683.pdf
