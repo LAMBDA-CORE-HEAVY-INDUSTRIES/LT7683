@@ -382,14 +382,17 @@ impl<I: LT7683Interface, RESET: OutputPin> LT7683<I, RESET> {
         self.draw_filled_rectangle(0, 0, self.config.width - 1, self.config.height - 1, color)
     }
 
-    /// Wait for BTE engine to complete (check status bit 6 = BTE busy).
     pub fn wait_bte_complete(&mut self) -> Result<(), I::Error> {
+        // TODO: timeout?
         loop {
-            let status = self.read_status()?;
-            if (status & 0x40) == 0 {
+            let ctrl = self.read_register(Register::BteCtrl0)?;
+            // Bit 4 = BTE busy when read
+            if (ctrl & 0x10) == 0 {
                 break;
             }
         }
+        // Disable BTE
+        self.write_register(Register::BteCtrl0, 0x00)?;
         Ok(())
     }
 
