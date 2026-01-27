@@ -410,10 +410,9 @@ impl<I: LT7683Interface, RESET: OutputPin> LT7683<I, RESET> {
         self.write_register(Register::DtX1, (x >> 8) as u8)?;
         self.write_register(Register::DtY0, y as u8)?;
         self.write_register(Register::DtY1, (y >> 8) as u8)?;
-
-        // TODO: This needs to be corrected.
-        self.write_register(Register::BteColr, self.config.color_depth as u8)?;
-
+        // NOTE: when doing constant color/alpha blending, bits should be 4-2 different.
+        let depth = self.config.color_depth as u8;
+        self.write_register(Register::BteColr, depth | (depth << 5) | (depth << 2))?;
         // Set destination image width
         let canvas_width = self.config.width;
         self.write_register(Register::DtWth0, canvas_width as u8)?;
@@ -470,11 +469,10 @@ impl<I: LT7683Interface, RESET: OutputPin> LT7683<I, RESET> {
         self.write_register(Register::BteWth1, (width >> 8) as u8)?;
         self.write_register(Register::BteHig0, height as u8)?;
         self.write_register(Register::BteHig1, (height >> 8) as u8)?;
-
-        // TODO: This needs to be corrected.
-        self.write_register(Register::BteColr, self.config.color_depth as u8)?;
-
-        // BTE memory copy with ROP
+        // NOTE: when doing constant color/alpha blending, bits should be 4-2 different.
+        let depth = self.config.color_depth as u8;
+        self.write_register(Register::BteColr, depth | (depth << 5) | (depth << 2))?;
+        // BTE memory copy: ROP=0xC (S0), operation=0x2
         self.write_register(Register::BteCtrl1, 0xC2)?;
         // Enable BTE write
         self.write_register(Register::BteCtrl0, 0x10)?;
