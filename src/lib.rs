@@ -268,6 +268,19 @@ impl<I: LT7683Interface, RESET: OutputPin> LT7683<I, RESET> {
         self.set_color_registers(color, Register::Bgcr, Register::Bgcg, Register::Bgcb)
     }
 
+    /// Sets the blink period of text cursor from range of 1 (0x00) to 256 (0xFF), expressed in
+    /// number of display frames. For example if the panel runs at 60hz, blink period of 0x00 would
+    /// mean the text cursor blinks every 16.7ms.
+    pub fn set_text_cursor_blink_period(&mut self, blink_period: u8) -> Result<(), I::Error> {
+        self.write_register(Register::Btcr, blink_period)?;
+        Ok(())
+    }
+
+    pub fn enable_text_cursor(&mut self) -> Result<(), I::Error> {
+        self.write_register(Register::Gtccr, 0x03)?;
+        Ok(())
+    }
+
     fn set_color_registers(&mut self, color: u32, reg_r: Register, reg_g: Register, reg_b: Register) -> Result<(), I::Error> {
         // Input: 0x00RRGGBB (8 bits per channel)
         let r = ((color >> 16) & 0xFF) as u8;
@@ -413,7 +426,7 @@ impl<I: LT7683Interface, RESET: OutputPin> LT7683<I, RESET> {
         self.write_register(Register::DtX1, (x >> 8) as u8)?;
         self.write_register(Register::DtY0, y as u8)?;
         self.write_register(Register::DtY1, (y >> 8) as u8)?;
-        // NOTE: when doing constant color/alpha blending, bits should be 4-2 different.
+        // NOTE: when doing constant color/alpha blending, bits 4-2 should be different.
         let depth = self.config.color_depth as u8;
         self.write_register(Register::BteColr, depth | (depth << 5) | (depth << 2))?;
         // Set destination image width
