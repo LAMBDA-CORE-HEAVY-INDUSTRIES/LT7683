@@ -276,8 +276,12 @@ impl<I: LT7683Interface, RESET: OutputPin> LT7683<I, RESET> {
         Ok(())
     }
 
-    pub fn enable_text_cursor(&mut self) -> Result<(), I::Error> {
-        self.write_register(Register::Gtccr, 0x03)?;
+    pub fn enable_text_cursor(&mut self, enable_blink: bool) -> Result<(), I::Error> {
+        let mut data = 0x02;
+        if enable_blink {
+            data = 0x03;
+        }
+        self.write_register(Register::Gtccr, data)?;
         Ok(())
     }
 
