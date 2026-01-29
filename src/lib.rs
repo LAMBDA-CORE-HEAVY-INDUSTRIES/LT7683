@@ -321,7 +321,7 @@ impl<I: LT7683Interface, RESET: OutputPin> LT7683<I, RESET> {
         Ok(())
     }
 
-    pub fn draw_filled_rectangle(&mut self, x1: u16, y1: u16, x2: u16, y2: u16, color: u32) -> Result<(), I::Error> {
+    pub fn draw_rectangle(&mut self, x1: u16, y1: u16, x2: u16, y2: u16, color: u32, fill: bool) -> Result<(), I::Error> {
         self.set_foreground_color(color)?;
         // Set start point
         self.write_register(Register::Dlhsr1, x1 as u8)?;
@@ -333,8 +333,8 @@ impl<I: LT7683Interface, RESET: OutputPin> LT7683<I, RESET> {
         self.write_register(Register::Dlher2, (x2 >> 8) as u8)?;
         self.write_register(Register::Dlver1, y2 as u8)?;
         self.write_register(Register::Dlver2, (y2 >> 8) as u8)?;
-
-        self.write_register(Register::Dcr1, 0xE0)?;
+        let draw_data = if fill { 0xE0 } else { 0xA0 };
+        self.write_register(Register::Dcr1, draw_data)?;
         self.wait_busy_draw()?;
         Ok(())
     }
@@ -399,7 +399,7 @@ impl<I: LT7683Interface, RESET: OutputPin> LT7683<I, RESET> {
 
     /// Clear entire screen with color.
     pub fn clear_screen(&mut self, color: u32) -> Result<(), I::Error> {
-        self.draw_filled_rectangle(0, 0, self.config.width - 1, self.config.height - 1, color)
+        self.draw_rectangle(0, 0, self.config.width - 1, self.config.height - 1, color, true)
     }
 
     pub fn wait_bte_complete(&mut self) -> Result<(), I::Error> {

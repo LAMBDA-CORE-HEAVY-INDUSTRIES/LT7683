@@ -212,9 +212,9 @@ pub enum Register {
     Dtpv2 = 0x73,
     /// Draw Circle/Ellipse/Ellipse Curve/Circle Square Control Register 1.
     Dcr1 = 0x76,
-    ///  Draw Circle/Ellipse/Rounded-Rectangle Major-Radius Register 1.
+    /// Draw Circle/Ellipse/Rounded-Rectangle Major-Radius Register 1.
     EllA1 = 0x77,
-    ///  Draw Circle/Ellipse/Rounded-Rectangle Major-Radius Register 2.
+    /// Draw Circle/Ellipse/Rounded-Rectangle Major-Radius Register 2.
     EllA2 = 0x78,
     /// Draw Circle/Ellipse/Rounded-rectangle Minor-Radius Register 1.
     EllB1 = 0x79,
