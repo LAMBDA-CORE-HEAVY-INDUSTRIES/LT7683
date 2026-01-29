@@ -402,6 +402,24 @@ impl<I: LT7683Interface, RESET: OutputPin> LT7683<I, RESET> {
         self.draw_rectangle(0, 0, self.config.width - 1, self.config.height - 1, color, true)
     }
 
+    /// Set the canvas start address (where drawing operations write to).
+    pub fn set_canvas_address(&mut self, addr: u32) -> Result<(), I::Error> {
+        self.write_register(Register::Cvssa1, addr as u8)?;
+        self.write_register(Register::Cvssa2, (addr >> 8) as u8)?;
+        self.write_register(Register::Cvssa3, (addr >> 16) as u8)?;
+        self.write_register(Register::Cvssa4, (addr >> 24) as u8)?;
+        Ok(())
+    }
+
+    /// Set the main image start address (what is displayed on screen).
+    pub fn set_main_image_address(&mut self, addr: u32) -> Result<(), I::Error> {
+        self.write_register(Register::Misa1, addr as u8)?;
+        self.write_register(Register::Misa2, (addr >> 8) as u8)?;
+        self.write_register(Register::Misa3, (addr >> 16) as u8)?;
+        self.write_register(Register::Misa4, (addr >> 24) as u8)?;
+        Ok(())
+    }
+
     pub fn wait_bte_complete(&mut self) -> Result<(), I::Error> {
         // TODO: timeout?
         loop {
