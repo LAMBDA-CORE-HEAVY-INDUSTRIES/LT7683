@@ -392,6 +392,28 @@ impl<I: LT7683Interface, RESET: OutputPin> LT7683<I, RESET> {
         self.wait_busy_draw()?;
         Ok(())
     }
+
+    pub fn draw_rounded_rectangle(&mut self, x1: u16, y1: u16, x2: u16, y2: u16, corner_radius: u16, color: u32, fill: bool) -> Result<(), I::Error> {
+        self.set_foreground_color(color)?;
+        // Set rectangle corners
+        self.write_register(Register::Dlhsr1, x1 as u8)?;
+        self.write_register(Register::Dlhsr2, (x1 >> 8) as u8)?;
+        self.write_register(Register::Dlvsr1, y1 as u8)?;
+        self.write_register(Register::Dlvsr2, (y1 >> 8) as u8)?;
+        self.write_register(Register::Dlher1, x2 as u8)?;
+        self.write_register(Register::Dlher2, (x2 >> 8) as u8)?;
+        self.write_register(Register::Dlver1, y2 as u8)?;
+        self.write_register(Register::Dlver2, (y2 >> 8) as u8)?;
+        // Set corner radius
+        self.write_register(Register::EllA1, corner_radius as u8)?;
+        self.write_register(Register::EllA2, (corner_radius >> 8) as u8)?;
+        self.write_register(Register::EllB1, corner_radius as u8)?;
+        self.write_register(Register::EllB2, (corner_radius >> 8) as u8)?;
+        let draw_data = if fill { 0xF0 } else { 0xB0 };
+        self.write_register(Register::Dcr1, draw_data)?;
+        self.wait_busy_draw()?;
+        Ok(())
+    }
     /// When bg_color is not provided, characters background will be the canvas background.
     pub fn write_text(&mut self, text: &str, x: u16, y: u16, bg_color: Option<u32>, fg_color: u32) -> Result<(), I::Error> {
         self.write_text_scaled(text, x, y, bg_color, fg_color, 1, 1)
