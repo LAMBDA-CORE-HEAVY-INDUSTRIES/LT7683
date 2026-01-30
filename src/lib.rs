@@ -414,6 +414,30 @@ impl<I: LT7683Interface, RESET: OutputPin> LT7683<I, RESET> {
         self.wait_busy_draw()?;
         Ok(())
     }
+
+    pub fn draw_triangle(&mut self, x1: u16, y1: u16, x2: u16, y2: u16, x3: u16, y3: u16, color: u32, fill: bool) -> Result<(), I::Error> {
+        self.set_foreground_color(color)?;
+        // Set point 1
+        self.write_register(Register::Dlhsr1, x1 as u8)?;
+        self.write_register(Register::Dlhsr2, (x1 >> 8) as u8)?;
+        self.write_register(Register::Dlvsr1, y1 as u8)?;
+        self.write_register(Register::Dlvsr2, (y1 >> 8) as u8)?;
+        // Set point 2
+        self.write_register(Register::Dlher1, x2 as u8)?;
+        self.write_register(Register::Dlher2, (x2 >> 8) as u8)?;
+        self.write_register(Register::Dlver1, y2 as u8)?;
+        self.write_register(Register::Dlver2, (y2 >> 8) as u8)?;
+        // Set point 3
+        self.write_register(Register::Dtph1, x3 as u8)?;
+        self.write_register(Register::Dtph2, (x3 >> 8) as u8)?;
+        self.write_register(Register::Dtpv1, y3 as u8)?;
+        self.write_register(Register::Dtpv2, (y3 >> 8) as u8)?;
+        let draw_data = if fill { 0xA2 } else { 0x82 };
+        self.write_register(Register::Dcr0, draw_data)?;
+        self.wait_busy_draw()?;
+        Ok(())
+    }
+
     /// When bg_color is not provided, characters background will be the canvas background.
     pub fn write_text(&mut self, text: &str, x: u16, y: u16, bg_color: Option<u32>, fg_color: u32) -> Result<(), I::Error> {
         self.write_text_scaled(text, x, y, bg_color, fg_color, 1, 1)
