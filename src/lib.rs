@@ -357,6 +357,41 @@ impl<I: LT7683Interface, RESET: OutputPin> LT7683<I, RESET> {
         Ok(())
     }
 
+    pub fn draw_circle(&mut self, center_x: u16, center_y: u16, radius: u16, color: u32, fill: bool) -> Result<(), I::Error> {
+        self.set_foreground_color(color)?;
+        // Set center point
+        self.write_register(Register::Dehr1, center_x as u8)?;
+        self.write_register(Register::Dehr2, (center_x >> 8) as u8)?;
+        self.write_register(Register::Devr1, center_y as u8)?;
+        self.write_register(Register::Devr2, (center_y >> 8) as u8)?;
+        // Set radius
+        self.write_register(Register::EllA1, radius as u8)?;
+        self.write_register(Register::EllA2, (radius >> 8) as u8)?;
+        self.write_register(Register::EllB1, radius as u8)?;
+        self.write_register(Register::EllB2, (radius >> 8) as u8)?;
+        let draw_data = if fill { 0xC0 } else { 0x80 };
+        self.write_register(Register::Dcr1, draw_data)?;
+        self.wait_busy_draw()?;
+        Ok(())
+    }
+
+    pub fn draw_ellipse(&mut self, center_x: u16, center_y: u16, radius_x: u16, radius_y: u16, color: u32, fill: bool) -> Result<(), I::Error> {
+        self.set_foreground_color(color)?;
+        // Set center point
+        self.write_register(Register::Dehr1, center_x as u8)?;
+        self.write_register(Register::Dehr2, (center_x >> 8) as u8)?;
+        self.write_register(Register::Devr1, center_y as u8)?;
+        self.write_register(Register::Devr2, (center_y >> 8) as u8)?;
+        // Set radii
+        self.write_register(Register::EllA1, radius_x as u8)?;
+        self.write_register(Register::EllA2, (radius_x >> 8) as u8)?;
+        self.write_register(Register::EllB1, radius_y as u8)?;
+        self.write_register(Register::EllB2, (radius_y >> 8) as u8)?;
+        let draw_data = if fill { 0xC0 } else { 0x80 };
+        self.write_register(Register::Dcr1, draw_data)?;
+        self.wait_busy_draw()?;
+        Ok(())
+    }
     /// When bg_color is not provided, characters background will be the canvas background.
     pub fn write_text(&mut self, text: &str, x: u16, y: u16, bg_color: Option<u32>, fg_color: u32) -> Result<(), I::Error> {
         self.write_text_scaled(text, x, y, bg_color, fg_color, 1, 1)
