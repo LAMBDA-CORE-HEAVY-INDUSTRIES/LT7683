@@ -31,7 +31,7 @@ fn main() -> ! {
             dp.SPI1,
             (sck, miso, mosi),
             embedded_hal::spi::MODE_0,
-            1.MHz(),
+            4.MHz(),
             &clocks,
         );
         let spi_delay = cp.SYST.delay(&clocks);
@@ -48,14 +48,44 @@ fn main() -> ! {
         let spi_interface = lt7683::SpiInterface { spi: spi_device };
         let display_config = DisplayConfig::new();
         let mut display = lt7683::LT7683::new(spi_interface, res, display_config);
+        let _ = display.init_color_bar_test(&mut delay);
+        delay.delay_ms(1000);
         display.init(&mut delay).unwrap();
-        display.clear_screen(0x0000).unwrap();
-        display.draw_line(400, 100, 420, 300, 0xAAAA);
-        display.draw_line(900, 100, 1000, 200, 0x2222);
-        display.draw_line(600, 500, 600, 300, 0xBBBB);
-        display.draw_filled_rectangle(500, 500, 800, 300, 0xB2B2);
-        display.draw_filled_rectangle(200, 400, 300, 200, 0xFFFF);
-        display.draw_filled_rectangle(800, 100, 700, 150, 0x2222);
+        display.clear_screen(0x00).unwrap();
+
+        display.draw_circle(100, 100, 50, 0xFF0000, true).unwrap();
+        display.draw_circle(100, 250, 50, 0xFF0000, false).unwrap();
+        display.write_text("Circles", 50, 320, None, 0xFFFFFF).unwrap();
+
+        display.draw_ellipse(300, 100, 80, 40, 0x00FF00, true).unwrap();
+        display.draw_ellipse(300, 250, 80, 40, 0x00FF00, false).unwrap();
+        display.write_text("Ellipses", 260, 320, None, 0xFFFFFF).unwrap();
+
+        display.draw_rounded_rectangle(420, 50, 580, 150, 20, 0x0000FF, true).unwrap();
+        display.draw_rounded_rectangle(420, 200, 580, 300, 20, 0x0000FF, false).unwrap();
+        display.write_text("Rounded Rects", 440, 320, None, 0xFFFFFF).unwrap();
+
+        display.draw_triangle(700, 50, 650, 150, 750, 150, 0xFFFF00, true).unwrap();
+        display.draw_triangle(700, 200, 650, 300, 750, 300, 0xFFFF00, false).unwrap();
+        display.write_text("Triangles", 660, 320, None, 0xFFFFFF).unwrap();
+
+        display.draw_circle(900, 150, 60, 0x333333, true).unwrap();
+        display.draw_triangle(880, 110, 880, 190, 940, 150, 0x00FF00, true).unwrap();
+
+        for i in 0..8 {
+            let x = 50 + i * 60;
+            let active = i == 2 || i == 5;
+            let color = if active { 0xFF6600 } else { 0x333333 };
+            display.draw_circle(x as u16, 460, 20, color, true).unwrap();
+            display.draw_circle(x as u16, 460, 20, 0x666666, false).unwrap();
+        }
+
+        display.write_text("Buttons:", 550, 400, None, 0xFFFFFF).unwrap();
+        display.draw_rounded_rectangle(550, 430, 680, 480, 10, 0x0066FF, true).unwrap();
+        display.write_text("SAVE", 590, 448, None, 0xFFFFFF).unwrap();
+        display.draw_rounded_rectangle(700, 430, 830, 480, 10, 0x333333, true).unwrap();
+        display.draw_rounded_rectangle(700, 430, 830, 480, 10, 0x666666, false).unwrap();
+        display.write_text("LOAD", 740, 448, None, 0xFFFFFF).unwrap();
         loop {}
     }
     loop {}
