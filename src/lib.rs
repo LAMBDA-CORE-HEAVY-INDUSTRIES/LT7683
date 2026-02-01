@@ -144,8 +144,10 @@ impl<I: LT7683Interface, RESET: OutputPin> LT7683<I, RESET> {
         self.wait_sdram_ready(delay)?;
         // TFT 24-bit output, SPI flash enabled, 8-bit host bus
         self.write_register(Register::Ccr, 0x80)?;
-        // 8-bit host, 16bpp
-        self.write_register(Register::Macr, 0x40)?;
+        // Memory access color depth
+        // NOTE: Memory Store Direction is hardcoded as original (00b).
+        // See: 5.4 Image Rotate and Mirror in https://www.buydisplay.com/download/ic/LT7683.pdf
+        self.write_register(Register::Macr, (self.config.color_depth as u8) << 6)?;
         // Graphic mode, SDRAM memory
         self.write_register(Register::Icr, 0x00)?;
         self.configure_display_timing()?;
@@ -218,8 +220,8 @@ impl<I: LT7683Interface, RESET: OutputPin> LT7683<I, RESET> {
     }
 
     fn configure_main_window(&mut self) -> Result<(), I::Error> {
-        // Main/PIP window control: 16bpp color depth
-        self.write_register(Register::Mpwctr, 0x04)?;
+        // Main/PIP window color depth
+        self.write_register(Register::Mpwctr, (self.config.color_depth as u8) << 2)?;
         // Main image start address
         self.write_register(Register::Misa1, 0x00)?;
         self.write_register(Register::Misa2, 0x00)?;
