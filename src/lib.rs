@@ -476,7 +476,7 @@ impl<I: LT7683Interface, RESET: OutputPin> LT7683<I, RESET> {
         self.write_register(Register::FCury2, (y >> 8) as u8)?;
         for &char in text.as_bytes() {
             self.write_register(Register::Mrwdp, char)?;
-            self.wait_busy_draw();
+            self.wait_busy_draw()?;
         }
         Ok(())
     }
