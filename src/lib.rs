@@ -55,11 +55,19 @@ pub struct LT7683<I: LT7683Interface, RESET> {
     pub spi_interface: I,
     pub res: RESET,
     pub config: DisplayConfig,
+    last_fg: Option<u32>,
+    last_bg: Option<u32>,
 }
 
 impl<I: LT7683Interface, RESET: OutputPin> LT7683<I, RESET> {
     pub fn new(spi_interface: I, res: RESET, display_config: DisplayConfig) -> Self {
-        Self { spi_interface, res, config: display_config}
+        Self {
+            spi_interface,
+            res,
+            config: display_config,
+            last_fg: None,
+            last_bg: None,
+        }
     }
 
     pub fn write_register(&mut self, register: Register, data: u8) -> Result<(), I::Error> {
@@ -106,6 +114,8 @@ impl<I: LT7683Interface, RESET: OutputPin> LT7683<I, RESET> {
         delay.delay_ms(10);
         let _ = self.res.set_high();
         delay.delay_ms(100);
+        self.last_fg = None;
+        self.last_bg = None;
         Ok(())
     }
 
@@ -115,6 +125,8 @@ impl<I: LT7683Interface, RESET: OutputPin> LT7683<I, RESET> {
         for _ in 0..100 {
             let val = self.read_register(Register::Srr)?;
             if (val & 0x01) == 0 {
+                self.last_fg = None;
+                self.last_bg = None;
                 return Ok(());
             }
             delay.delay_ms(1);
@@ -263,11 +275,21 @@ impl<I: LT7683Interface, RESET: OutputPin> LT7683<I, RESET> {
     }
 
     pub fn set_foreground_color(&mut self, color: u32) -> Result<(), I::Error> {
-        self.set_color_registers(color, Register::Fgcr, Register::Fgcg, Register::Fgcb)
+        if self.last_fg == Some(color) {
+            return Ok(());
+        }
+        self.set_color_registers(color, Register::Fgcr, Register::Fgcg, Register::Fgcb)?;
+        self.last_fg = Some(color);
+        Ok(())
     }
 
     pub fn set_background_color(&mut self, color: u32) -> Result<(), I::Error> {
-        self.set_color_registers(color, Register::Bgcr, Register::Bgcg, Register::Bgcb)
+        if self.last_bg == Some(color) {
+            return Ok(());
+        }
+        self.set_color_registers(color, Register::Bgcr, Register::Bgcg, Register::Bgcb)?;
+        self.last_bg = Some(color);
+        Ok(())
     }
 
     /// Sets the blink period of text cursor from range of 1 (0x00) to 256 (0xFF), expressed in
